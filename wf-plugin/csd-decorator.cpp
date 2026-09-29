@@ -19,6 +19,9 @@
  *   Copyright © 2026 Scott Moreau <oreaus@gmail.com>
  *
  */
+#include <fstream>
+#include <string>
+#include <unistd.h>
 #include <memory>
 #include <wayfire/core.hpp>
 #include <wayfire/seat.hpp>
@@ -1548,8 +1551,82 @@ wf::option_wrapper_t<bool> decorate_csd{"csd-decorator/decorate_csd"};
 wf::view_matcher_t ignore_views_match{"csd-decorator/ignore_views"};
 wf::option_wrapper_t<std::string> ignore_views_as_string{"csd-decorator/ignore_views"};
 
+static bool is_flatpak_gtk4(wayfire_view view)
+{
+    auto surface = view->get_wlr_surface();
+
+    if (!surface || !surface->resource)
+    {
+        return false;
+    }
+
+    wl_client *client = wl_resource_get_client(surface->resource);
+
+    if (!client)
+    {
+        return false;
+    }
+
+    pid_t pid = -1;
+    uid_t uid = 0;
+    gid_t gid = 0;
+
+    wl_client_get_credentials(client, &pid, &uid, &gid);
+
+    if (pid <= 0)
+    {
+        return false;
+    }
+
+
+    const auto proc = std::string("/proc/") + std::to_string(pid);
+
+    /*
+     * A Flatpak application has .flatpak-info inside its sandbox root.
+     * /proc/<pid>/root lets Wayfire inspect that root from the host.
+     */
+    std::ifstream flatpak_info(proc + "/root/.flatpak-info");
+
+    if (!flatpak_info.good())
+    {
+        return false;
+    }
+
+    /*
+     * Do not identify GTK4 merely from the application ID or Flatpak
+     * runtime. Check the actual libraries loaded by the application.
+     */
+    std::ifstream maps(proc + "/maps");
+
+    if (!maps.good())
+    {
+        return false;
+    }
+
+    std::string line;
+
+    while (std::getline(maps, line))
+    {
+        if (line.find("libgtk-4.so") != std::string::npos)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static bool should_be_decorated(wayfire_view view)
 {
+    /*
+     * GTK4 applications running inside Flatpak already provide their
+     * own CSD. Do not create another decoration for them.
+     */
+    if (is_flatpak_gtk4(view))
+    {
+        return false;
+    }
+
     if (ignore_views_match.matches(view))
     {
         return false;
@@ -1567,6 +1644,7 @@ static bool should_be_decorated(wayfire_view view)
 
     return true;
 }
+
 
 void bind_decorator(wl_client *client, void*, uint32_t, uint32_t id)
 {
