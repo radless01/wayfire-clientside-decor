@@ -562,6 +562,23 @@ void destroy_deco_window(uint32_t wf_id)
     }
 }
 
+void set_app_id(GtkWidget *window, const char *app_id)
+{
+    auto wdata = win_data[window];
+    wdata->app_id = app_id;
+
+    add_tab_button(wdata.get(), wdata.get());
+
+    GtkDropTarget *drop_target =
+        gtk_drop_target_new(G_TYPE_INT, GdkDragAction(GDK_ACTION_COPY | GDK_ACTION_MOVE));
+
+    g_signal_connect(drop_target, "drop", G_CALLBACK(drop_cb), wdata.get());
+    gtk_widget_add_controller(wdata->tab_box, GTK_EVENT_CONTROLLER(drop_target));
+
+    gtk_header_bar_pack_start(GTK_HEADER_BAR(wdata->header_bar), wdata->title_box);
+}
+
+
 void set_title(GtkWidget *window, const char *title)
 {
     gtk_window_set_title(GTK_WINDOW(window), title);
@@ -570,22 +587,7 @@ void set_title(GtkWidget *window, const char *title)
     wdata->title = title;
 }
 
-void set_app_id(GtkWidget *window, const char *app_id)
-{
-    auto wdata = win_data[window];
-    wdata->app_id = app_id;
 
-    gtk_header_bar_pack_start(GTK_HEADER_BAR(wdata->header_bar), get_icon(std::string(app_id)));
-
-    add_tab_button(wdata.get(), wdata.get());
-
-    GtkDropTarget *drop_target =
-        gtk_drop_target_new(G_TYPE_INT, GdkDragAction(GDK_ACTION_COPY | GDK_ACTION_MOVE));
-    g_signal_connect(drop_target, "drop", G_CALLBACK(drop_cb), wdata.get());
-    gtk_widget_add_controller(wdata->tab_box, GTK_EVENT_CONTROLLER(drop_target));
-
-    gtk_header_bar_pack_start(GTK_HEADER_BAR(wdata->header_bar), wdata->title_box);
-}
 
 int main(int argc, char **argv)
 {
