@@ -19,6 +19,9 @@ static void activate(GtkApplication *app, gpointer)
 {
     GdkDisplay *display = gdk_display_get_default();
     setup_protocol(display);
+    
+    GtkSettings *settings = gtk_settings_get_default();
+    g_object_set(settings, "gtk-decoration-layout", "appmenu:minimize,maximize,close", NULL);
 
     g_application_hold(G_APPLICATION(app));
 }
